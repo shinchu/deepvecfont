@@ -4,7 +4,7 @@ from PIL import ImageFont
 import argparse
 import numpy as np
 import os
-import multiprocessing as mp
+import pathos.multiprocessing as mp
 
 def write_glyph_imgs_mp(opts):
 
@@ -23,7 +23,7 @@ def write_glyph_imgs_mp(opts):
         for i in range(process_id * font_num_p_process, (process_id + 1) * font_num_p_process):
             if i >= font_num:
                 break
-        
+
             fontname = ttf_names[i].split('.')[0]
             print(fontname)
             g_idx_dict = {}
@@ -72,7 +72,7 @@ def write_glyph_imgs_mp(opts):
                 except:
                     print('cant calculate height and width ' + "%04d"%i + '_' + '{num:0{width}}'.format(num=charid, width=charset_lenw))
                     continue
-                
+
                 try:
                     ascent, descent = font.getmetrics()
                 except:
@@ -82,15 +82,12 @@ def write_glyph_imgs_mp(opts):
                 delta = (opts.img_size - (descent + ascent)) / 2
                 draw.text((add_to_x, add_to_y + opts.img_size - ascent - int((opts.img_size / 24.0) * (4.0 / 3.0))), char, (0) ,font=font)
                 fontimgs_array[charid] = np.array(image)
-                
+
             np.save(os.path.join(opts.sfd_path, opts.split, fontname, 'imgs_' + str(opts.img_size) + '.npy'), fontimgs_array)
 
-    processes = [mp.Process(target=process, args=(pid, font_num_per_process)) for pid in range(process_nums)]
+    p = mp.ProcessPool(process_nums)
+    p.map(process, [pid for pid in range(process_nums)], [font_num_per_process] * process_nums)
 
-    for p in processes:
-        p.start()
-    for p in processes:
-        p.join()
 
 def main():
     parser = argparse.ArgumentParser(description="Write glyph images")

@@ -26,13 +26,13 @@ def test_main_model(opts):
     res_dir = os.path.join(exp_dir, "results")
     if not os.path.exists(res_dir):
         os.mkdir(res_dir)
-    
+
     test_loader = get_loader(opts.data_root, opts.image_size, opts.char_categories, opts.max_seq_len, opts.seq_feature_dim, opts.batch_size, opts.read_mode, 'test')
 
     img_encoder = ImageEncoder(img_size=opts.image_size, input_nc=opts.char_categories, output_nc=1, ngf=16, norm_layer=nn.LayerNorm)
 
     img_decoder = ImageDecoder(img_size=opts.image_size, input_nc=opts.bottleneck_bits + opts.char_categories, output_nc=1, ngf=16, norm_layer=nn.LayerNorm)
-    
+
     vggptlossfunc = VGGPerceptualLoss()
 
     modality_fusion = ModalityFusion(img_feat_dim=16 * opts.image_size, hidden_size=opts.hidden_size, ref_nshot=opts.ref_nshot, bottleneck_bits=opts.bottleneck_bits, mode=opts.mode)
@@ -48,7 +48,7 @@ def test_main_model(opts):
                                  hidden_size=opts.hidden_size,
                                  num_hidden_layers=opts.num_hidden_layers,
                                  feature_dim=opts.seq_feature_dim, ff_dropout=opts.ff_dropout, rec_dropout=opts.rec_dropout)
-    
+
     mdn_top_layer = SVGMDNTop(num_mixture=opts.num_mixture, seq_len=opts.max_seq_len, hidden_size=opts.hidden_size,
                               mode=opts.mode, mix_temperature=opts.mix_temperature,
                               gauss_temperature=opts.gauss_temperature, dont_reduce=opts.dont_reduce_loss)
@@ -57,27 +57,27 @@ def test_main_model(opts):
     # load parameters
     epoch = opts.test_epoch
     img_encoder_fpath = os.path.join(ckpt_dir, f"{opts.model_name}_{epoch}.imgenc.pth")
-    img_encoder.load_state_dict(torch.load(img_encoder_fpath))
+    img_encoder.load_state_dict(torch.load(img_encoder_fpath, map_location=device))
     img_encoder.eval()
 
     img_decoder_fpath = os.path.join(ckpt_dir, f"{opts.model_name}_{epoch}.imgdec.pth")
-    img_decoder.load_state_dict(torch.load(img_decoder_fpath))
+    img_decoder.load_state_dict(torch.load(img_decoder_fpath, map_location=device))
     img_decoder.eval()
 
     svg_encoder_fpath = os.path.join(ckpt_dir, f"{opts.model_name}_{epoch}.seqenc.pth")
-    svg_encoder.load_state_dict(torch.load(svg_encoder_fpath))
+    svg_encoder.load_state_dict(torch.load(svg_encoder_fpath, map_location=device))
     svg_encoder.eval()
 
     svg_decoder_fpath = os.path.join(ckpt_dir, f"{opts.model_name}_{epoch}.seqdec.pth")
-    svg_decoder.load_state_dict(torch.load(svg_decoder_fpath))
+    svg_decoder.load_state_dict(torch.load(svg_decoder_fpath, map_location=device))
     svg_decoder.eval()
 
     modality_fusion_fpath = os.path.join(ckpt_dir, f"{opts.model_name}_{epoch}.modalfuse.pth")
-    modality_fusion.load_state_dict(torch.load(modality_fusion_fpath))
+    modality_fusion.load_state_dict(torch.load(modality_fusion_fpath, map_location=device))
     modality_fusion.eval()
 
     mdn_top_layer_fpath = os.path.join(ckpt_dir, f"{opts.model_name}_{epoch}.mdntl.pth")
-    mdn_top_layer.load_state_dict(torch.load(mdn_top_layer_fpath))
+    mdn_top_layer.load_state_dict(torch.load(mdn_top_layer_fpath, map_location=device))
     mdn_top_layer.eval()
 
     # to device
@@ -106,20 +106,20 @@ def test_main_model(opts):
     imgsr_opt.phase = 'test'
     imgsr_model = create_model(imgsr_opt)      # create a model given opt.model and other options
     imgsr_model.setup(imgsr_opt)               # regular setup: load and print networks; create schedulers
-    
+
     with torch.no_grad():
         for test_idx, test_data in enumerate(test_loader):
             print("testing font %04d ..."%test_idx)
             img_decoder_out, vggpt_loss, kl_loss, svg_losses, trg_img, ref_img, gt_trg_seq, sampled_svg_list =\
                 network_forward(test_data, mean, std, opts, network_modules)
-            
+
             output_img = img_decoder_out["gen_imgs"]
             imgsr_model.set_test_input(1.0 - 2 * output_img)
             #imgsr_model.set_test_input(1.0 - 2 * torch.tile(output_img,(1,3,1,1))) # from [0,1] to [-1,1] and change fore/background color
             with torch.no_grad():
                 imgsr_model.forward()
 
-            output_img_hr = imgsr_model.fake_B 
+            output_img_hr = imgsr_model.fake_B
             savedir_idx = os.path.join(res_dir, "%04d"%test_idx)
 
             if not os.path.exists(savedir_idx):
@@ -130,7 +130,7 @@ def test_main_model(opts):
 
             img_sample_merge = torch.cat((trg_img.data, output_img.data), -2)
             save_file_merge = os.path.join(savedir_idx, "imgs_" + str(opts.image_size), f"merge_" + str(opts.image_size) + ".png")
-            save_image(img_sample_merge, save_file_merge, nrow=8, normalize=True)    
+            save_image(img_sample_merge, save_file_merge, nrow=8, normalize=True)
 
             for char_idx in range(opts.char_categories):
                 img_gt = (1.0 - trg_img[char_idx,...]).data
@@ -141,12 +141,12 @@ def test_main_model(opts):
                 save_file = os.path.join(savedir_idx,"imgs_" + str(opts.image_size), f"{char_idx:02d}_" + str(opts.image_size) + ".png")
                 #save_image(img_sample, save_file, nrow=8, normalize=True)
                 save_image(img_sample, save_file, normalize=True)
-                
+
                 img_sample_hr = output_img_hr[char_idx,...].data
                 save_file_hr = os.path.join(savedir_idx,"imgs_" + str(opts.image_size_sr), f"{char_idx:02d}_" + str(opts.image_size_sr) + ".png")
                 #save_image(img_sample_hr, save_file_hr, nrow=8, normalize=True)
-                save_image(img_sample_hr, save_file_hr, normalize=True) 
-            
+                save_image(img_sample_hr, save_file_hr, normalize=True)
+
             # save the generated svgs and gt svgs
             syn_svg_merge_f = open(os.path.join(os.path.join(savedir_idx,"svgs"), f"syn_merge.html"), 'w')
             for sample_id, sampled_svg in enumerate(sampled_svg_list):
@@ -154,7 +154,7 @@ def test_main_model(opts):
                 svg_dec_out = sampled_svg.clone().detach()
                 svg_dec_out = svg_dec_out.transpose(0,1)
                 svg_dec_out = svg_dec_out * std  + mean
-                
+
                 for i, one_seq in enumerate(svg_dec_out):
                     syn_svg_outfile = os.path.join(os.path.join(savedir_idx,"svgs"), f"syn_{i:02d}_{sample_id:02d}.svg")
                     syn_svg_f = open(syn_svg_outfile, 'w')
@@ -164,11 +164,11 @@ def test_main_model(opts):
                         syn_svg_merge_f.write(svg)
                         if i > 0 and i % 13 == 12:
                             syn_svg_merge_f.write('<br>')
-                        
+
                     except:
                         continue
                     syn_svg_f.close()
-                
+
                 syn_svg_f.close()
 
             svg_target = gt_trg_seq.clone().detach()
@@ -184,8 +184,8 @@ def test_main_model(opts):
                     syn_svg_merge_f.write('<br>')
             gt_svg_f.close()
             syn_svg_merge_f.close()
-                                            
-        
+
+
         val_img_l1_loss /= len(test_loader)
         val_img_pt_loss /= len(test_loader)
 
@@ -203,12 +203,12 @@ def network_forward(data, mean, std, opts, network_moudules):
     img_encoder, img_decoder, modality_fusion, vggptlossfunc, svg_encoder, svg_decoder, mdn_top_layer = network_moudules
 
     input_image = data['rendered'].to(device) # bs, opts.char_categories, opts.image_size, opts.image_size
-    input_sequence = data['sequence'].to(device) 
+    input_sequence = data['sequence'].to(device)
     input_clss = data['class'].to(device) # bs, opts.char_categories, 1
     input_seqlen = data['seq_len'].to(device) # bs, opts.char_categories 1
-    
+
     input_sequence = (input_sequence - mean) / std
-    
+
     # randomly choose reference classes and target classes
     if opts.ref_nshot == 1:
         ref_cls = torch.randint(0, opts.char_categories, (input_image.size(0), opts.ref_nshot)).to(device)
@@ -218,8 +218,8 @@ def network_forward(data, mean, std, opts, network_moudules):
         #ref_cls_upper = torch.randint(0, opts.char_categories // 2, (input_image.size(0), opts.ref_nshot // 2)).to(device) # bs, 1
         #ref_cls_lower = torch.randint(opts.char_categories // 2, opts.char_categories, (input_image.size(0), opts.ref_nshot - opts.ref_nshot // 2)).to(device) # bs, 1
         ref_cls = torch.cat((ref_cls_upper,ref_cls_lower), -1)
-    
-    # the input reference images 
+
+    # the input reference images
     trg_cls = torch.randint(0, opts.char_categories, (input_image.size(0), 1)).to(device) # bs, 1
     trg_cls = torch.arange(0, opts.char_categories).to(device) # bs, 1
     trg_cls = trg_cls.view(opts.char_categories, 1)
@@ -230,7 +230,7 @@ def network_forward(data, mean, std, opts, network_moudules):
     ref_cls_multihot = ref_cls_multihot.to(torch.float32)
     ref_cls_multihot = ref_cls_multihot.unsqueeze(2)
     ref_cls_multihot = ref_cls_multihot.unsqueeze(3)
-    ref_cls_multihot = ref_cls_multihot.expand(input_image.size(0), opts.char_categories, opts.image_size, opts.image_size)   
+    ref_cls_multihot = ref_cls_multihot.expand(input_image.size(0), opts.char_categories, opts.image_size, opts.image_size)
     ref_img = torch.mul(input_image, ref_cls_multihot)
 
     # randomly select a target glyph image
@@ -251,7 +251,7 @@ def network_forward(data, mean, std, opts, network_moudules):
     img_encoder_out = img_encoder(ref_img, opts.bottleneck_bits)
     img_feat = img_encoder_out['img_feat']
     # run the svg encoder
-    ref_seq_cat = ref_seq.view(ref_seq.size(0) * ref_seq.size(1), ref_seq.size(2), ref_seq.size(3)) #  [opts.batch_size * opts.ref_nshot, opts.max_seq_len, opts.seq_feature_dim]        
+    ref_seq_cat = ref_seq.view(ref_seq.size(0) * ref_seq.size(1), ref_seq.size(2), ref_seq.size(3)) #  [opts.batch_size * opts.ref_nshot, opts.max_seq_len, opts.seq_feature_dim]
     ref_seq_cat = ref_seq_cat.transpose(0,1) #  [opts.max_seq_len, opts.batch_size * opts.ref_nshot,  opts.seq_feature_dim]
     se_init_state = svg_encoder.init_state_input(torch.zeros(ref_seq_cat.size(1), opts.bottleneck_bits).to(device))
     hidden, cell = se_init_state['hidden'], se_init_state['cell']
@@ -282,7 +282,7 @@ def network_forward(data, mean, std, opts, network_moudules):
     # run image decoder
     latent_feat = latent_feat.repeat(opts.char_categories, 1)
     img_decoder_out = img_decoder(latent_feat, trg_char, trg_img)
-    
+
     vggpt_loss = vggptlossfunc(img_decoder_out['gen_imgs'], trg_img)
 
 
@@ -308,7 +308,7 @@ def network_forward(data, mean, std, opts, network_moudules):
             output_self, hidden_self, cell_self =  decoder_output_self['output'], decoder_output_self['hidden'], decoder_output_self['cell']
             top_output_self = mdn_top_layer(output_self)
             sampled_step = mdn_top_layer.sample(top_output_self, output_self, opts.mode)
-            sampled_svg[t] = sampled_step 
+            sampled_svg[t] = sampled_step
 
         sampled_svg_list.append(sampled_svg)
 

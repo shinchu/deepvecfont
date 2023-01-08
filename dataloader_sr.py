@@ -1,6 +1,6 @@
 # data loader for training image super-resolution model
 import os
-import pickle
+import dill as pickle
 import numpy as np
 import torch
 import torch.utils.data as data
@@ -31,7 +31,7 @@ class SVGDataset(data.Dataset):
             self.all_glyphs = pickle.load(pkl_f)
             pkl_f.close()
             print(f"Finished loading")
-        
+
     def __getitem__(self, index):
         if self.read == 'dirs':
             font_path = self.font_paths[index]
@@ -55,8 +55,11 @@ class SVGDataset(data.Dataset):
         else:
             return len(self.all_fonts)
 
+def normalize(X):
+    return 2 * X - 1.
+
 def get_loader(root_path, char_num, batch_size, read_mode, img_sl, im_sh, mode='train'):
-    SetRange = T.Lambda(lambda X: 2 * X - 1.)  # convert [0, 1] -> [-1, 1]
+    SetRange = T.Lambda(normalize)  # convert [0, 1] -> [-1, 1]
     #SetRange = T.Lambda(lambda X: 1. - X )  # convert [0, 1] -> [0, 1]
     transform = T.Compose([SetRange])
     dataset = SVGDataset(root_path, char_num, transform, read_mode, img_sl, im_sh, mode)

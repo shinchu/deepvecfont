@@ -1,6 +1,6 @@
 # data loader for training main model
 import os
-import pickle
+import dill as pickle
 import numpy as np
 import torch
 import torch.utils.data as data
@@ -60,10 +60,12 @@ class SVGDataset(data.Dataset):
         else:
             return len(self.all_fonts)
 
+def normalize(X):
+    return 1. - X
 
 def get_loader(root_path, img_size, char_num, max_seq_len, seq_feature_dim, batch_size, read_mode, mode='train'):
     #SetRange = T.Lambda(lambda X: 2 * X - 1.)  # convert [0, 1] -> [-1, 1]
-    SetRange = T.Lambda(lambda X: 1. - X )  # convert [0, 1] -> [0, 1]
+    SetRange = T.Lambda(normalize)  # convert [0, 1] -> [0, 1]
     transform = T.Compose([SetRange])
     dataset = SVGDataset(root_path, img_size, char_num, max_seq_len, seq_feature_dim, transform, read_mode, mode)
     dataloader = data.DataLoader(dataset, batch_size, shuffle=(mode == 'train'), num_workers=batch_size, drop_last=True)

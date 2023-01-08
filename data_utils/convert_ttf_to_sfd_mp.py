@@ -4,11 +4,10 @@ from __future__ import print_function
 
 import fontforge  # noqa
 import os
-import multiprocessing as mp
+import pathos.multiprocessing as mp
 import argparse
 
-# conda deactivate
-# apt install python3-fontforge
+# asdf local system
 
 def convert_mp(opts):
     """Useing multiprocessing to convert all fonts to sfd files"""
@@ -18,7 +17,7 @@ def convert_mp(opts):
     sfd_path = opts.sfd_path
     for root, dirs, files in os.walk(os.path.join(opts.ttf_path, opts.split)):
         ttf_fnames = files
-    
+
     font_num = len(ttf_fnames)
     process_nums = mp.cpu_count() - 2
     font_num_per_process = font_num // process_nums + 1
@@ -27,11 +26,11 @@ def convert_mp(opts):
         for i in range(process_id * font_num_p_process, (process_id + 1) * font_num_p_process):
             if i >= font_num:
                 break
-            
+
             font_id = ttf_fnames[i].split('.')[0]
             split = opts.split
             font_name = ttf_fnames[i]
-            
+
             font_file_path = os.path.join(fonts_file_path, split, font_name)
             try:
                 cur_font = fontforge.open(font_file_path)
@@ -67,12 +66,8 @@ def convert_mp(opts):
 
             cur_font.close()
 
-    processes = [mp.Process(target=process, args=(pid, font_num_per_process)) for pid in range(process_nums)]
-
-    for p in processes:
-        p.start()
-    for p in processes:
-        p.join()
+    p = mp.ProcessPool(process_nums)
+    p.map(process, [pid for pid in range(process_nums)], [font_num_per_process] * process_nums)
 
 
 def main():

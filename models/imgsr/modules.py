@@ -62,13 +62,13 @@ class BaseOptions():
         # basic parameters
         parser.add_argument('--dataroot', default='./data/vecfont_dataset_dirs_sr/', help='path to images')
         parser.add_argument('--name', type=str, default='image_sr', help='name of the experiment. It decides where to store samples and models')
-        parser.add_argument('--gpu_ids', type=str, default='0', help='gpu ids: e.g. 0  0,1,2, 0,2. use -1 for CPU')
+        parser.add_argument('--gpu_ids', type=str, default='-1', help='gpu ids: e.g. 0  0,1,2, 0,2. use -1 for CPU')
         parser.add_argument('--checkpoints_dir', type=str, default='./experiments', help='models are saved here')
         # model parameters
         #parser.add_argument('--model', type=str, default='cycle_gan', help='chooses which model to use. [cycle_gan | pix2pix | test | colorization]')
         parser.add_argument('--img_lr', type=int, default=128, help='the low resoluion of images')
         parser.add_argument('--img_hr', type=int, default=256, help='the high resoluion of images')
-        parser.add_argument('--read_mode', type=str, default='dirs', choices=['dirs', 'pkl'], 
+        parser.add_argument('--read_mode', type=str, default='dirs', choices=['dirs', 'pkl'],
                             help='how to read the data, *dirs* consumes much less memory')
         parser.add_argument('--char_categories', type=int, default=52, help='char_categories')
         parser.add_argument('--input_nc', type=int, default=1, help='# of input image channels: 3 for RGB and 1 for grayscale')
@@ -190,7 +190,7 @@ class TrainOptions(BaseOptions):
         parser.add_argument('--display_port', type=int, default=8097, help='visdom port of the web display')
         parser.add_argument('--update_html_freq', type=int, default=1000, help='frequency of saving training results to html')
         parser.add_argument('--print_freq', type=int, default=100, help='frequency of showing training results on console')
-        parser.add_argument('--no_html', action='store_true', help='do not save intermediate training results to [opt.checkpoints_dir]/[opt.name]/web/')        
+        parser.add_argument('--no_html', action='store_true', help='do not save intermediate training results to [opt.checkpoints_dir]/[opt.name]/web/')
         # network saving and loading parameters
         parser.add_argument('--save_latest_freq', type=int, default=5000, help='frequency of saving the latest results')
         parser.add_argument('--save_epoch_freq', type=int, default=25, help='frequency of saving checkpoints at the end of epochs')
@@ -256,7 +256,7 @@ def create_model(opt):
         >>> from models import create_model
         >>> model = create_model(opt)
     """
-    
+
     instance = Pix2PixModel(opt)
     print("model [%s] was created" % type(instance).__name__)
     return instance
@@ -289,7 +289,7 @@ class ImageFolder(data.Dataset):
 
     def __len__(self):
         return len(self.imgs)
-        
+
 class BaseModel(ABC):
     """This class is an abstract base class (ABC) for models.
     To create a subclass, you need to implement the following five functions:
@@ -604,7 +604,7 @@ class Pix2PixModel(BaseModel):
             nums = selected_cls.size(1)
             selected_cls_ = selected_cls.unsqueeze(2)
             selected_cls_ = selected_cls_.unsqueeze(3)
-            selected_cls_ = selected_cls_.expand(images_of_onefont.size(0), nums, image_size, image_size)         
+            selected_cls_ = selected_cls_.expand(images_of_onefont.size(0), nums, image_size, image_size)
             selected_img = torch.gather(images_of_onefont, 1, selected_cls_)
             return selected_img
 
@@ -790,7 +790,7 @@ class CustomDatasetDataLoader():
         self.opt = opt
         #dataset_class = find_dataset_using_name(opt.dataset_mode)
         self.dataset = AlignedDataset(opt)
-        
+
         self.dataloader = torch.utils.data.DataLoader(
             self.dataset,
             batch_size=opt.batch_size,

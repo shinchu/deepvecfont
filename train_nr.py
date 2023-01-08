@@ -1,7 +1,7 @@
 import os
 import random
 import torch
-import pickle
+import dill as pickle
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
@@ -29,10 +29,10 @@ def train_nr_model(opts):
     train_loader = get_loader(opts.data_root, opts.image_size, opts.char_categories, opts.max_seq_len, opts.seq_feature_dim, opts.batch_size, opts.read_mode, opts.mode)
     val_loader = get_loader(opts.data_root, opts.image_size, opts.char_categories, opts.max_seq_len, opts.seq_feature_dim, opts.batch_size, opts.read_mode, 'test')
 
-    neural_rasterizer = NeuralRasterizer(img_size=opts.image_size, feature_dim=opts.seq_feature_dim, hidden_size=opts.hidden_size, num_hidden_layers=opts.num_hidden_layers, 
-                                         ff_dropout_p=opts.ff_dropout, rec_dropout_p=opts.rec_dropout, input_nc=2 * opts.hidden_size, 
+    neural_rasterizer = NeuralRasterizer(img_size=opts.image_size, feature_dim=opts.seq_feature_dim, hidden_size=opts.hidden_size, num_hidden_layers=opts.num_hidden_layers,
+                                         ff_dropout_p=opts.ff_dropout, rec_dropout_p=opts.rec_dropout, input_nc=2 * opts.hidden_size,
                                          output_nc=1, ngf=16, bottleneck_bits=opts.bottleneck_bits, norm_layer=nn.LayerNorm, mode='train')
-    
+
     vggcxlossfunc = VGGContextualLoss()
 
     if torch.cuda.is_available() and opts.multi_gpu:
@@ -42,7 +42,7 @@ def train_nr_model(opts):
     neural_rasterizer = neural_rasterizer.to(device)
     vggcxlossfunc = vggcxlossfunc.to(device)
 
-    all_parameters = list(neural_rasterizer.parameters()) 
+    all_parameters = list(neural_rasterizer.parameters())
     optimizer = Adam(all_parameters, lr=opts.lr, betas=(opts.beta1, opts.beta2), eps=opts.eps, weight_decay=opts.weight_decay)
 
     if opts.tboard:
@@ -107,7 +107,7 @@ def train_nr_model(opts):
                 img_sample = torch.cat((trg_img.data, output_img.data), -2)
                 save_file = os.path.join(sample_dir, f"train_epoch_{epoch}_batch_{batches_done}.png")
                 save_image(img_sample, save_file, nrow=8, normalize=True)
-                
+
                 svg_target = gt_trg_seq.clone().detach()
                 svg_target = svg_target * std  + mean
                 for i, one_gt_seq in enumerate(svg_target):
@@ -117,14 +117,14 @@ def train_nr_model(opts):
                         with open(cur_svg_file, 'a') as f:
                             f.write(gt_svg+'\n')
                         break
-                
+
             if opts.val_freq > 0 and batches_done % opts.val_freq == 0:
                 val_img_l1_loss = 0.0
                 val_img_pt_loss = 0.0
 
                 with torch.no_grad():
                     for val_idx, val_data in enumerate(val_loader):
-                        
+
                         val_input_image = val_data['rendered'].to(device)
                         val_input_clss = val_data['class'].to(device)
                         val_input_sequence = val_data['sequence'].to(device)
@@ -143,7 +143,7 @@ def train_nr_model(opts):
                         val_vggcx_loss = vggcxlossfunc(val_output_image, val_trg_img)
                         val_img_l1_loss += val_rec_loss.item()
                         val_img_pt_loss += val_vggcx_loss['cx_loss']
-                    
+
                     val_img_l1_loss /= len(val_loader)
                     val_img_pt_loss /= len(val_loader)
 
@@ -174,7 +174,7 @@ def train_nr_model(opts):
 
                     val_logfile.write(val_msg + "\n")
                     print(val_msg)
-             
+
 
         if epoch % opts.ckpt_freq == 0:
             model_fpath = os.path.join(ckpt_dir, f"{opts.model_name}_{epoch}.nr.pth")
@@ -182,7 +182,7 @@ def train_nr_model(opts):
                 torch.save(neural_rasterizer.module.state_dict(), model_fpath)
             else:
                 torch.save(neural_rasterizer.state_dict(), model_fpath)
-                
+
     logfile.close()
     val_logfile.close()
 

@@ -1,7 +1,8 @@
 import argparse
-import multiprocessing as mp
+from multiprocessing import Manager
+import pathos.multiprocessing as mp
 import os
-import pickle
+import dill as pickle
 import numpy as np
 import svg_utils
 
@@ -80,7 +81,7 @@ def create_db(opts):
                 cur_font_glyphs.append(example)
                 char_desp_f.close()
                 sfd_f.close()
-            
+
             if len(cur_font_glyphs) == num_chars:
                 # use the font whose all glyphs are valid
                 # merge the whole font
@@ -108,12 +109,8 @@ def create_db(opts):
                 np.save(os.path.join(opts.output_path, opts.split, '{num:0{width}}'.format(num=i, width=num_fonts_w), 'font_id.npy'), np.array(binaryfp))
                 np.save(os.path.join(opts.output_path, opts.split, '{num:0{width}}'.format(num=i, width=num_fonts_w), 'rendered_' + str(opts.img_size) + '.npy'), rendered)
 
-    processes = [mp.Process(target=process, args=[pid]) for pid in range(num_processes)]
-
-    for p in processes:
-        p.start()
-    for p in processes:
-        p.join()
+    p = mp.ProcessPool(num_processes)
+    p.map(process, [pid for pid in range(num_processes)])
 
     print("Finished processing all sfd files, logs (invalid glyphs and paths) are saved to", opts.log_dir)
 
@@ -129,8 +126,8 @@ def cal_mean_stddev(opts):
     num_fonts = len(font_paths)
     num_processes = mp.cpu_count() - 2
     fonts_per_process = num_fonts // num_processes + 1
-    num_chars = len(opts.charset) 
-    manager = mp.Manager()
+    num_chars = len(opts.charset)
+    manager = Manager()
     return_dict = manager.dict()
     main_stddev_accum = svg_utils.MeanStddev()
 
@@ -147,12 +144,9 @@ def cal_mean_stddev(opts):
                 cur_font_char['sequence'] = np.load(os.path.join(cur_font_path, 'sequence.npy')).tolist()[charid]
                 cur_sum_count = mean_stddev_accum.add_input(cur_sum_count, cur_font_char)
         return_dict[process_id] = cur_sum_count
-    processes = [mp.Process(target=process, args=[pid, return_dict]) for pid in range(num_processes)]
 
-    for p in processes:
-        p.start()
-    for p in processes:
-        p.join()
+    p = mp.ProcessPool(num_processes)
+    p.map(process, [pid for pid in range(num_processes)], [return_dict] * num_processes)
 
     merged_sum_count = main_stddev_accum.merge_accumulators(return_dict.values())
     output = main_stddev_accum.extract_output(merged_sum_count)
@@ -198,6 +192,6 @@ def main():
     if opts.phase <= 2 and opts.split == 'train':
         cal_mean_stddev(opts)
 
-    
+
 if __name__ == "__main__":
     main()

@@ -1,7 +1,7 @@
 import argparse
 import multiprocessing as mp
 import os
-import pickle
+import dill as pickle
 import numpy as np
 import svg_utils
 
@@ -79,7 +79,7 @@ def create_db(opts):
                 cur_font_glyphs.append(example)
                 char_desp_f.close()
                 sfd_f.close()
-            
+
             if len(cur_font_glyphs) == num_chars:
                 # use the font whose all glyphs are valid
                 # merge the whole font
@@ -142,7 +142,7 @@ def cal_mean_stddev(opts):
     num_fonts = len(all_fonts)
     num_processes = mp.cpu_count() - 2
     fonts_per_process = num_fonts // num_processes + 1
-    num_chars = len(opts.charset) 
+    num_chars = len(opts.charset)
     manager = mp.Manager()
     return_dict = manager.dict()
     main_stddev_accum = svg_utils.MeanStddev()
@@ -207,7 +207,7 @@ def main():
 
     if opts.phase <= 1:
         create_db(opts)
-    
+
     if opts.phase <= 2:
         number_saved_glyphs = combine_perprocess_pkl_db(opts)
         print(f"Number {opts.split} fonts after processing", number_saved_glyphs)
@@ -215,6 +215,6 @@ def main():
     if opts.phase <= 3 and opts.split == 'train':
         cal_mean_stddev(opts)
 
-    
+
 if __name__ == "__main__":
     main()
