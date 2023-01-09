@@ -1,8 +1,8 @@
 import argparse
+import multiprocessing as mp
 from multiprocessing import Manager
-import pathos.multiprocessing as mp
+from pathos.helpers import mp as pmp
 import os
-import dill as pickle
 import numpy as np
 import svg_utils
 
@@ -109,8 +109,12 @@ def create_db(opts):
                 np.save(os.path.join(opts.output_path, opts.split, '{num:0{width}}'.format(num=i, width=num_fonts_w), 'font_id.npy'), np.array(binaryfp))
                 np.save(os.path.join(opts.output_path, opts.split, '{num:0{width}}'.format(num=i, width=num_fonts_w), 'rendered_' + str(opts.img_size) + '.npy'), rendered)
 
-    p = mp.ProcessPool(num_processes)
-    p.map(process, [pid for pid in range(num_processes)])
+    processes = [pmp.Process(target=process, args=[pid]) for pid in range(num_processes)]
+
+    for p in processes:
+        p.start()
+    for p in processes:
+        p.join()
 
     print("Finished processing all sfd files, logs (invalid glyphs and paths) are saved to", opts.log_dir)
 
@@ -145,8 +149,12 @@ def cal_mean_stddev(opts):
                 cur_sum_count = mean_stddev_accum.add_input(cur_sum_count, cur_font_char)
         return_dict[process_id] = cur_sum_count
 
-    p = mp.ProcessPool(num_processes)
-    p.map(process, [pid for pid in range(num_processes)], [return_dict] * num_processes)
+    processes = [pmp.Process(target=process, args=[pid, return_dict]) for pid in range(num_processes)]
+
+    for p in processes:
+        p.start()
+    for p in processes:
+        p.join()
 
     merged_sum_count = main_stddev_accum.merge_accumulators(return_dict.values())
     output = main_stddev_accum.extract_output(merged_sum_count)

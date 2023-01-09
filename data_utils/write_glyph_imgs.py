@@ -4,7 +4,7 @@ from PIL import ImageFont
 import argparse
 import numpy as np
 import os
-import pathos.multiprocessing as mp
+from pathos.helpers import mp
 
 def write_glyph_imgs_mp(opts):
 
@@ -85,8 +85,12 @@ def write_glyph_imgs_mp(opts):
 
             np.save(os.path.join(opts.sfd_path, opts.split, fontname, 'imgs_' + str(opts.img_size) + '.npy'), fontimgs_array)
 
-    p = mp.ProcessPool(process_nums)
-    p.map(process, [pid for pid in range(process_nums)], [font_num_per_process] * process_nums)
+    processes = [mp.Process(target=process, args=(pid, font_num_per_process)) for pid in range(process_nums)]
+
+    for p in processes:
+        p.start()
+    for p in processes:
+        p.join()
 
 
 def main():

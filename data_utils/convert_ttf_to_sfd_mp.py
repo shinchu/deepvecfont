@@ -4,7 +4,7 @@ from __future__ import print_function
 
 import fontforge  # noqa
 import os
-import pathos.multiprocessing as mp
+from pathos.helpers import mp
 import argparse
 
 # asdf local system
@@ -66,8 +66,12 @@ def convert_mp(opts):
 
             cur_font.close()
 
-    p = mp.ProcessPool(process_nums)
-    p.map(process, [pid for pid in range(process_nums)], [font_num_per_process] * process_nums)
+    processes = [mp.Process(target=process, args=(pid, font_num_per_process)) for pid in range(process_nums)]
+
+    for p in processes:
+        p.start()
+    for p in processes:
+        p.join()
 
 
 def main():
